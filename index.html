@@ -25,12 +25,12 @@
 			#title h1 {
 				font-weight: 900;
 				font-size: 3rem;
-				margin: 0;
+				margin: 0 2rem;
 			}
 			#title h2 {
 				font-weight: 500;
 				font-size: 1rem;
-				margin: 0;
+				margin: 0 2rem;
 			}
 
 			#instructions {
@@ -43,7 +43,13 @@
 			#instructions p {
 				font-weight: 300;
 				font-size: 1rem;
-				margin: 0;
+				margin: 0 2rem;
+			}
+
+			@media screen and (max-width: 900px) {
+				#title h1 { font-size: 1.5rem; }
+				#title h2 { font-size: 0.5rem; }
+				#instructions p { font-size: 0.5rem; }
 			}
 		</style>
 	</head>
