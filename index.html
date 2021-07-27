@@ -199,7 +199,7 @@
 				update(dt) {
 					this.mesh.material.visilbe = this.mesh.scale.z != 0;
 					this.mesh.material.opacity = Math.max(0, this.mesh.material.opacity - dt);
-					this.mesh.scale.z = Math.max(0, this.mesh.scale.z - 20.0 * dt);
+					this.mesh.scale.z = Math.max(0, this.mesh.scale.z - 10.0 * dt);
 				}
 			};
 
@@ -222,8 +222,8 @@
 				}
 
 				update(dt, x, z) {
-					const rx = 2.0 * Math.random() - 1.0;
-					const rz = 2.0 * Math.random() - 1.0;
+					const rx = (2.0 * Math.random() - 1.0) * 0.05 * this.scale;
+					const rz = (2.0 * Math.random() - 1.0) * 0.05 * this.scale;
 					const y  = terrain.height(x + rx, z + rz);
 
 					this.particles.forEach(p => p.update(dt));
@@ -273,17 +273,20 @@
 			water.mesh.rotation.x = -0.5 * Math.PI;
 			scene.add(water.mesh);
 
+			const size = 0.2;
+			const scale = 10.0;
+			const amount = 512;
 			const players = [];
-			players.push(new Player(0.0, 0.0, 0.5, 20.0, 0xff2100, 10.0, 64));
-			players.push(new Player(0.0, 0.0, 0.5, 20.0, 0x0021ff, 10.0, 64));
-			players.push(new Player(0.0, 0.0, 0.5, 20.0, 0x21ff00, 10.0, 64));
+			players.push(new Player(0.0, 0.0, size, scale, 0xff2100, 10.0, amount));
+			players.push(new Player(0.0, 0.0, size, scale, 0x0021ff, 10.0, amount));
+			players.push(new Player(0.0, 0.0, size, scale, 0x21ff00, 10.0, amount));
 			players.forEach(player => player.particles.forEach(p => scene.add(p.mesh)));
 
 			const controls = new OrbitControls(camera, renderer.domElement);
 			controls.minPolarAngle = 0.005;
 			controls.maxPolarAngle = Math.PI * 0.495;
 			controls.target.set(0, 10, 0);
-			controls.minDistance = 40.0;
+			controls.minDistance = 5.0;
 			controls.maxDistance = 400.0;
 			controls.update();
 
@@ -298,10 +301,11 @@
 				const time = performance.now() * 0.001;
 				water.update(1.0 / 60.0);
 
+				const t = 0.05 * time;
 				players.forEach(player => player.particles[player.idx].mesh.rotation.x = -0.5 * Math.PI);
-				players[0].update(1.0 / 60.0, 30 * Math.sin(time) + 10, 30 * Math.cos(time) + 10, terrain);
-				players[1].update(1.0 / 60.0, 30 * Math.cos(time) - 60, 30 * Math.cos(time) - 10, terrain);
-				players[2].update(1.0 / 60.0, 30 * Math.cos(time) - 90, 30 * Math.sin(time) + 50, terrain);
+				players[0].update(1.0 / 60.0, 30 * Math.sin(t) + 10, 30 * Math.cos(t) + 10, terrain);
+				players[1].update(1.0 / 60.0, 30 * Math.cos(t) - 60, 30 * Math.cos(t) - 10, terrain);
+				players[2].update(1.0 / 60.0, 30 * Math.cos(t) - 90, 30 * Math.sin(t) + 50, terrain);
 			
 				composer.render();
 				requestAnimationFrame(render);
