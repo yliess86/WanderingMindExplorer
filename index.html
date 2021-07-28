@@ -97,6 +97,68 @@
 				return val;
 			};
 
+			class Trace {
+				constructor(terrain) {
+					this.terrain = terrain;
+
+					this.trace_cvs = document.createElement('canvas');
+					this.trace_ctx = this.trace_cvs.getContext('2d');
+					
+					this.mix_cvs = document.createElement('canvas');
+					this.mix_ctx = this.mix_cvs.getContext('2d');
+
+					this.texture = new THREE.CanvasTexture(this.mix_cvs);
+					this.init = false;
+				}
+
+				update(players) {
+					if (this.terrain.data === undefined)
+						return;
+
+					if (!this.init) {
+						this.init = true;
+
+						this.trace_cvs.width = this.terrain.data.width;
+						this.trace_cvs.height = this.terrain.data.height;
+						this.trace_ctx.fillStyle = "white";
+						this.trace_ctx.fillRect(0, 0, this.trace_cvs.width, this.trace_cvs.height);
+						
+						this.mix_cvs.width = this.terrain.data.width;
+						this.mix_cvs.height = this.terrain.data.height;
+						this.mix_ctx.fillStyle = "black";
+						this.mix_ctx.fillRect(0, 0, this.mix_cvs.width, this.mix_cvs.height);
+					}
+					
+					
+					this.trace_ctx.filter = "blur(1px)";
+					this.trace_ctx.drawImage(this.trace_cvs, 0, 0);
+					this.trace_ctx.filter = "none";
+					
+					players.forEach(player => {
+						const uv = this.terrain.uv(player.x, player.z);
+						this.trace_ctx.fillStyle = player.hex;
+						this.trace_ctx.beginPath();
+						this.trace_ctx.arc(uv.u, uv.v, 2, 0, 2 * Math.PI, false);
+						this.trace_ctx.closePath();
+						this.trace_ctx.fill();
+					});
+
+					const w = this.trace_cvs.width, h = this.trace_cvs.height;
+					const trace_data = this.trace_ctx.getImageData(0, 0, w, h).data;
+					let mix_img = this.mix_ctx.getImageData(0, 0, w, h);
+					let mix_data = mix_img.data;
+
+					for (let i = 0; i < mix_data.length; i += 4) {
+						mix_data[i + 0] = Math.floor(this.terrain.data.data[i] * (trace_data[i + 0] / 255));
+						mix_data[i + 1] = Math.floor(this.terrain.data.data[i] * (trace_data[i + 1] / 255));
+						mix_data[i + 2] = Math.floor(this.terrain.data.data[i] * (trace_data[i + 2] / 255));
+					}
+					
+					this.mix_ctx.putImageData(mix_img, 0, 0);
+					this.terrain.material.map.needsUpdate = true;
+				}
+			};
+
 			class Terrain {
 				constructor(size, divisions, heightmap, data, scale, color) {
 					this.size = size;
@@ -106,10 +168,12 @@
 					this.scale = scale;
 					this.color = color;
 
+					this.trace = new Trace(this);
+
 					this.geometry = new THREE.PlaneGeometry(this.size, this.size, this.divisions - 1, this.divisions - 1);
 					this.material = new THREE.MeshStandardMaterial({
 						color            : color,
-						map              : heightmap,
+						map              : this.trace.texture,
 						displacementMap  : heightmap,
 						displacementScale: scale,
 						roughness        : 0.95,
@@ -119,18 +183,24 @@
 					this.mesh.castShadow = true;
 					this.mesh.recieveShadow = true;
 
-					getImageData('images/heightmap.png').then(data => terrain.data = data);
+					getImageData('images/heightmap_512.png').then(data => terrain.data = data);
+				}
+
+				update(players) { this.trace.update(players); }
+
+				uv(x, z) {
+					return {
+						u: Math.floor((x + 0.5 * this.size) / this.size * this.data.width),
+						v: Math.floor((z + 0.5 * this.size) / this.size * this.data.height),
+					};
 				}
 
 				height(x, z) {
 					if (this.data === undefined)
 						return 0;
 
-					return getPixel(
-						this.data,
-						Math.floor((x + 0.5 * this.size) / this.size * this.data.width),
-						Math.floor((z + 0.5 * this.size) / this.size * this.data.height),
-					) * this.scale;
+					const uv = this.uv(x, z);
+					return getPixel(this.data, uv.u, uv.v) * this.scale;
 				}
 			};
 
@@ -204,14 +274,17 @@
 			};
 
 			class Player {
-				constructor(x, y, size, scale, color, intensity, amount) {
-					this.x = x;
-					this.y = y;
+				constructor(size, scale, color, hex, intensity, amount) {
 					this.size = size;
 					this.scale = scale;
 					this.color = color;
+					this.hex = hex;
 					this.intensity = intensity;
 					this.amount = amount;
+
+					this.x = 0;
+					this.y = 0;
+					this.z = 0;
 					
 					this.idx = 0;
 					this.particles = [];
@@ -230,6 +303,10 @@
 					this.particles[this.idx].position(x + rx, y, z + rz);
 
 					this.idx = (this.idx + 1) % this.amount;
+					
+					this.x = x;
+					this.y = y;
+					this.z = z;
 				}
 			}
 
@@ -259,8 +336,8 @@
 			scene.add(light);
 			scene.add(light.target);
 						
-			const HEIGHTMAP = loader.load('images/heightmap.png');
-			const terrain = new Terrain(512, 1024, HEIGHTMAP, undefined, 25.0, 0xbdeff0);
+			const HEIGHTMAP = loader.load('images/heightmap_512.png');
+			const terrain = new Terrain(512, 512, HEIGHTMAP, undefined, 25.0, 0xbdeff0);
 			terrain.mesh.rotation.x = -0.5 * Math.PI;
 			scene.add(terrain.mesh);
 
@@ -275,11 +352,11 @@
 
 			const size = 0.2;
 			const scale = 10.0;
-			const amount = 512;
+			const amount = 128;
 			const players = [];
-			players.push(new Player(0.0, 0.0, size, scale, 0xff2100, 10.0, amount));
-			players.push(new Player(0.0, 0.0, size, scale, 0x0021ff, 10.0, amount));
-			players.push(new Player(0.0, 0.0, size, scale, 0x21ff00, 10.0, amount));
+			players.push(new Player(size, scale, 0xff2100, '#FF2100', 10.0, amount));
+			players.push(new Player(size, scale, 0x0021ff, '#0021FF', 10.0, amount));
+			players.push(new Player(size, scale, 0x21ff00, '#21FF00', 10.0, amount));
 			players.forEach(player => player.particles.forEach(p => scene.add(p.mesh)));
 
 			const controls = new OrbitControls(camera, renderer.domElement);
@@ -297,18 +374,29 @@
 			composer.addPass(render_pass);
 			composer.addPass(bloom_pass);
 			
-			const render = () => {
-				const time = performance.now() * 0.001;
-				water.update(1.0 / 60.0);
+			let dt = 0.0;
+			let current = new Date().getTime();
+			let ellapsed = 0.0;
 
-				const t = 0.05 * time;
+			const render = () => {
+				const now = new Date().getTime();
+				dt = now - current;
+
+				water.update(0.0005 * dt);
+
+				const t = 0.0001 * ellapsed;
 				players.forEach(player => player.particles[player.idx].mesh.rotation.x = -0.5 * Math.PI);
-				players[0].update(1.0 / 60.0, 30 * Math.sin(t) + 10, 30 * Math.cos(t) + 10, terrain);
-				players[1].update(1.0 / 60.0, 30 * Math.cos(t) - 60, 30 * Math.cos(t) - 10, terrain);
-				players[2].update(1.0 / 60.0, 30 * Math.cos(t) - 90, 30 * Math.sin(t) + 50, terrain);
+				players[0].update(1.0 / 60.0, 30 * Math.sin(t) + 10, 30 * Math.cos(t) +  10, terrain);
+				players[1].update(1.0 / 60.0, 30 * Math.cos(t) + 60, 30 * Math.cos(t) - 120, terrain);
+				players[2].update(1.0 / 60.0, 30 * Math.cos(t) + 90, 30 * Math.sin(t) -  50, terrain);
 			
+				terrain.update(players);
+
 				composer.render();
 				requestAnimationFrame(render);
+				
+				current = now;
+				ellapsed += dt;
 			};
 
 			window.addEventListener('resize', () => {
