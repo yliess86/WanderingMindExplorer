@@ -225,8 +225,6 @@
 						distortionScale: this.scale,
 						fog            : true,
 					});
-					this.mesh.castShadow = true;
-					this.mesh.recieveShadow = true;
 				}
 
 				update(dt) { this.mesh.material.uniforms['time'].value += dt; }
@@ -248,7 +246,6 @@
 						opacity: 1.0,
 					});
 					this.mesh = new THREE.Mesh(this.geometry, this.material);
-					this.mesh.castShadow = true;
 					this.mesh.scale.z = this.scale;
 					
 					this.x = 0.0;
@@ -310,11 +307,9 @@
 				}
 			}
 
-			const renderer = new THREE.WebGLRenderer();
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
 			renderer.setPixelRatio(window.devicePixelRatio);
 			renderer.setSize(window.innerWidth, window.innerHeight);
-			renderer.shadowMap.enabled = true;
-			renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 			renderer.toneMapping = THREE.ACESFilmicToneMapping;
 			document.body.appendChild(renderer.domElement);
 
@@ -327,12 +322,10 @@
 			const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 10, 1000);
 			camera.position.set(30, 30, 100);
 
-			const light = new THREE.DirectionalLight(0xbdeff0, 2.0);
-			light.castShadow = true;
-			light.shadow.mapSize.width = 512;
-			light.shadow.mapSize.height = 512;
-			light.position.set(10, 10, 10); 
-			light.target.position.set(0, 0, 0); 
+			const d = 256;
+			const light = new THREE.DirectionalLight(0xbdeff0, 1.5);
+			light.position.set(10, 200, 50);
+			light.target.position.set(-10, 0, -100);
 			scene.add(light);
 			scene.add(light.target);
 						
